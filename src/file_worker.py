@@ -38,8 +38,7 @@ class JSONSaver(AbstractFileWorker):
             vacancies = []
         # Проверяем, нет ли вакансии с таким же URL
         if not any(
-            isinstance(v, dict) and v.get("url") == vacancy["url"]
-            for v in vacancies
+            isinstance(v, dict) and v.get("url") == vacancy["url"] for v in vacancies
         ):
             vacancies.append(vacancy)
             self._write_vacancies(vacancies)
@@ -68,7 +67,8 @@ class JSONSaver(AbstractFileWorker):
         if not isinstance(vacancies, list):
             return
         vacancies = [
-            v for v in vacancies
+            v
+            for v in vacancies
             if not isinstance(v, dict) or v.get("url") != vacancy["url"]
         ]
         self._write_vacancies(vacancies)

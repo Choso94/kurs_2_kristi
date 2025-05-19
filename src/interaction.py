@@ -1,10 +1,14 @@
-from typing import List
 import json
 import os
 from src.api import HeadHunterAPI
 from src.vacancy import Vacancy
 from src.file_worker import JSONSaver
-from src.utils import filter_vacancies, sort_vacancies, get_top_vacancies, print_vacancies
+from src.utils import (
+    filter_vacancies,
+    sort_vacancies,
+    get_top_vacancies,
+    print_vacancies,
+)
 
 
 def user_interaction() -> None:
@@ -21,7 +25,9 @@ def user_interaction() -> None:
         elif use_local in ("n", "no"):
             use_local = False
             break
-        print("Ошибка: введите 'y' или 'n'.")
+        else:
+            print("Ошибка: введите 'y' или 'n'.")
+            continue
 
     if use_local:
         if not os.path.exists("vacancies.json"):
@@ -80,9 +86,11 @@ def user_interaction() -> None:
             print_vacancies(top_vacancies)
 
         elif choice == "2":
-            filter_words = input(
-                "Введите ключевые слова для фильтрации (через пробел): "
-            ).strip().split()
+            filter_words = (
+                input("Введите ключевые слова для фильтрации (через пробел): ")
+                .strip()
+                .split()
+            )
             filtered_vacancies = filter_vacancies(vacancies, filter_words)
             sorted_vacancies = sort_vacancies(filtered_vacancies)
             print_vacancies(sorted_vacancies)

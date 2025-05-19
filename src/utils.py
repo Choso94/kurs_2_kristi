@@ -9,7 +9,8 @@ def filter_vacancies(
     if not filter_words:
         return vacancies
     return [
-        v for v in vacancies
+        v
+        for v in vacancies
         if any(word.lower() in v.description.lower() for word in filter_words)
     ]
 

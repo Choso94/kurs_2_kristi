@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 
 class Vacancy:
     """Класс для работы с вакансиями."""
+
     __slots__ = ("_title", "_url", "_salary", "_description")
 
     def __init__(
@@ -10,7 +11,7 @@ class Vacancy:
         title: str,
         url: str,
         salary: Optional[Dict[str, Any]] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ):
         """Инициализирует вакансию с валидацией данных."""
         self._title = self._validate_title(title)
@@ -118,7 +119,7 @@ class Vacancy:
             "title": self._title,
             "url": self._url,
             "salary": self._salary,
-            "description": self._description
+            "description": self._description,
         }
 
     @classmethod
@@ -129,7 +130,7 @@ class Vacancy:
                 title=v.get("name", ""),
                 url=v.get("alternate_url", ""),
                 salary=v.get("salary"),
-                description=v.get("snippet", {}).get("requirement", "")
+                description=v.get("snippet", {}).get("requirement", ""),
             )
             for v in vacancies
         ]

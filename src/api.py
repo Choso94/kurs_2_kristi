@@ -44,9 +44,7 @@ class HeadHunterAPI(AbstractAPI):
                 self.__url, headers=self.__headers, params=self.__params
             )
             if response.status_code != 200:
-                raise ValueError(
-                    f"Ошибка получения вакансий: {response.status_code}"
-                )
+                raise ValueError(f"Ошибка получения вакансий: {response.status_code}")
             data = response.json()
             vacancies.extend(data.get("items", []))
             self.__params["page"] += 1

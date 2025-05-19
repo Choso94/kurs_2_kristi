@@ -1,5 +1,4 @@
 import pytest
-import os
 from src.file_worker import JSONSaver
 
 
@@ -14,7 +13,7 @@ def test_add_vacancy(json_saver):
         "title": "Python Developer",
         "url": "http://hh.ru/vacancy/1",
         "salary": "100000-150000 RUR",
-        "description": "Требуется Python"
+        "description": "Требуется Python",
     }
     json_saver.add_vacancy(vacancy)
     vacancies = json_saver.get_vacancies({})
@@ -27,7 +26,7 @@ def test_add_vacancy_no_duplicates(json_saver):
         "title": "Python Developer",
         "url": "http://hh.ru/vacancy/1",
         "salary": "100000-150000 RUR",
-        "description": "Требуется Python"
+        "description": "Требуется Python",
     }
     json_saver.add_vacancy(vacancy)
     json_saver.add_vacancy(vacancy)
@@ -40,7 +39,7 @@ def test_delete_vacancy(json_saver):
         "title": "Python Developer",
         "url": "http://hh.ru/vacancy/1",
         "salary": "100000-150000 RUR",
-        "description": "Требуется Python"
+        "description": "Требуется Python",
     }
     json_saver.add_vacancy(vacancy)
     json_saver.delete_vacancy(vacancy)

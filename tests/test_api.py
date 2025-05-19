@@ -1,5 +1,4 @@
 import pytest
-import requests
 from unittest.mock import patch
 from src.api import HeadHunterAPI
 
@@ -27,9 +26,9 @@ def test_get_vacancies(mock_get, hh_api):
     mock_response = {
         "items": [
             {"name": "Python Developer", "alternate_url": "http://hh.ru/vacancy/1"},
-            {"name": "Java Developer", "alternate_url": "http://hh.ru/vacancy/2"}
+            {"name": "Java Developer", "alternate_url": "http://hh.ru/vacancy/2"},
         ],
-        "pages": 1
+        "pages": 1,
     }
     mock_get.return_value.status_code = 200
     mock_get.return_value.json.return_value = mock_response
