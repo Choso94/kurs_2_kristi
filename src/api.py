@@ -4,50 +4,45 @@ import requests
 
 
 class AbstractAPI(ABC):
-    """Абстрактный класс для работы с API сервисов с вакансиями."""
+    """Абстрактный класс для работы с API."""
 
     @abstractmethod
-    def _connect(self) -> None:
-        """Подключается к API, проверяет доступность."""
-        pass
-
-    @abstractmethod
-    def get_vacancies(self, keyword: str) -> List[Dict[str, Any]]:
-        """Получает вакансии по ключевому слову."""
+    def get_vacancies(self, search_query: str) -> List[Dict[str, Any]]:
+        """Получает список вакансий по поисковому запросу."""
         pass
 
 
 class HeadHunterAPI(AbstractAPI):
-    """Класс для работы с API HeadHunter."""
+    """Класс для работы с API hh.ru."""
 
-    def __init__(self):
-        self.__url = "https://api.hh.ru/vacancies"
-        self.__headers = {"User-Agent": "HH-User-Agent"}
-        self.__params = {"text": "", "page": 0, "per_page": 100}
-
-    def _connect(self) -> None:
-        """Проверяет доступность API hh.ru."""
-        response = requests.get(self.__url, headers=self.__headers)
-        if response.status_code != 200:
-            raise ConnectionError(
-                f"Ошибка подключения к API hh.ru: {response.status_code}"
-            )
-
-    def get_vacancies(self, keyword: str) -> List[Dict[str, Any]]:
-        """Получает вакансии с hh.ru по ключевому слову."""
-        self._connect()
-        self.__params["text"] = keyword
-        self.__params["page"] = 0
-        vacancies = []
-        while self.__params["page"] < 20:  # Ограничение до 2000 вакансий
-            response = requests.get(
-                self.__url, headers=self.__headers, params=self.__params
-            )
-            if response.status_code != 200:
-                raise ValueError(f"Ошибка получения вакансий: {response.status_code}")
+    def get_vacancies(self, search_query: str) -> List[Dict[str, Any]]:
+        """Получает вакансии с hh.ru по поисковому запросу."""
+        url = "https://api.hh.ru/vacancies"
+        params = {"text": search_query, "per_page": 100, "page": 0}
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
             data = response.json()
-            vacancies.extend(data.get("items", []))
-            self.__params["page"] += 1
-            if self.__params["page"] >= data.get("pages", 1):
-                break
-        return vacancies
+            print(
+                f"Ответ API: {data.get('items', [])[:2]}"
+            )  # Отладка: первые 2 вакансии
+            vacancies = data.get("items", [])
+            if not vacancies:
+                print(f"По запросу '{search_query}' вакансии не найдены.")
+            return vacancies
+        except requests.ConnectionError:
+            raise Exception("Ошибка подключения: проверьте интернет-соединение.")
+        except requests.Timeout:
+            raise Exception("Превышено время ожидания: попробуйте позже.")
+        except requests.HTTPError as e:
+            msg = (
+                f"Ошибка API: HTTP {e.response.status_code}. "
+                f"Попробуйте позже или используйте локальный vacancies.json."
+            )
+            raise Exception(msg)
+        except requests.RequestException as e:
+            msg = (
+                f"Неизвестная ошибка API: {e}. "
+                f"Используйте локальный vacancies.json или проверьте запрос."
+            )
+            raise Exception(msg)

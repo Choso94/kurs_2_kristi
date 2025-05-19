@@ -18,20 +18,25 @@ def user_interaction() -> None:
 
     print("Добро пожаловать в поиск вакансий на hh.ru!")
     while True:
-        use_local = input("Использовать локальный vacancies.json? (y/n): ").strip().lower()
-        if use_local in ("y", "yes"):
+        use_local = (
+            input("Использовать локальный vacancies.json? (да/нет, y/n): ")
+            .strip()
+            .lower()
+        )
+        if use_local in ("y", "yes", "да"):
             use_local = True
             break
-        elif use_local in ("n", "no"):
+        elif use_local in ("n", "no", "нет"):
             use_local = False
             break
-        else:
-            print("Ошибка: введите 'y' или 'n'.")
-            continue
+        print("Ошибка: введите 'да', 'нет', 'y' или 'n'.")
 
     if use_local:
         if not os.path.exists("vacancies.json"):
             print("Ошибка: файл vacancies.json не найден.")
+            print(
+                "Попробуйте запустить программу с API для создания файла или добавьте vacancies.json вручную."
+            )
             return
         try:
             with open("vacancies.json", "r", encoding="utf-8") as f:
@@ -42,6 +47,9 @@ def user_interaction() -> None:
                 print("Ошибка: некорректный формат данных в vacancies.json.")
                 return
             vacancies = Vacancy.cast_to_object_list(vacancies_data)
+            if not vacancies:
+                print("В файле vacancies.json нет валидных вакансий.")
+                return
         except Exception as e:
             print(f"Ошибка при чтении vacancies.json: {e}")
             return
@@ -55,10 +63,17 @@ def user_interaction() -> None:
             vacancies = Vacancy.cast_to_object_list(vacancies_data)
         except Exception as e:
             print(f"Ошибка при получении вакансий: {e}")
+            print("Рекомендации:")
+            print("- Проверьте подключение к интернету.")
+            print(
+                "- Используйте локальный файл vacancies.json (выберите 'да' при запуске)."
+            )
+            print("- Повторите запрос позже.")
             return
 
     if not vacancies:
-        print("Вакансии не найдены.")
+        print(f"Вакансии по запросу '{search_query}' не найдены.")
+        print("Попробуйте изменить запрос или использовать локальный vacancies.json.")
         return
 
     # Сохраняем вакансии в файл
