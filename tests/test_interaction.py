@@ -1,73 +1,84 @@
-from unittest.mock import patch
+import pytest
 from src.interaction import user_interaction
+from src.api import HeadHunterAPI
+from src.vacancy import Vacancy
+from unittest.mock import patch
 
+def test_user_interaction_exit():
+    """Тест выхода из интерфейса."""
+    with patch("builtins.input", side_effect=["8"]):
+        user_interaction()
 
-@patch("builtins.input", side_effect=["y", "3"])
-@patch("builtins.print")
-@patch("src.interaction.os.path.exists", return_value=True)
-@patch(
-    "src.interaction.json.load",
-    return_value=[
-        {
-            "title": "Python Developer",
-            "url": "https://hh.ru/vacancy/123",
-            "salary": "100000-150000 RUR",
-            "description": "Python experience",
-        }
-    ],
-)
-def test_user_interaction_local(mock_json_load, mock_exists, mock_print, mock_input):
-    user_interaction()
-    mock_print.assert_any_call("Добро пожаловать в поиск вакансий на hh.ru!")
-    mock_print.assert_any_call("До свидания!")
+def test_user_interaction_search(monkeypatch):
+    """Тест поиска вакансий."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+        def json(self):
+            return {
+                "items": [
+                    {"name": "Job1", "alternate_url": "https://hh.ru", "salary": {"from": 100000, "to": 150000, "currency": "RUR"}, "description": "Desc", "id": "1"}
+                ]
+            }
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: MockResponse())
+    with patch("builtins.input", side_effect=["1", "Python", "8"]):
+        user_interaction()
 
+def test_user_interaction_invalid_choice():
+    """Тест обработки неверного выбора."""
+    with patch("builtins.input", side_effect=["9", "8"]):
+        with patch("builtins.print") as mocked_print:
+            user_interaction()
+            mocked_print.assert_any_call("Введите число от 1 до 8.")
 
-@patch("builtins.input", side_effect=["n", "Python", "3"])
-@patch("builtins.print")
-@patch(
-    "src.interaction.HeadHunterAPI.get_vacancies",
-    return_value=[
-        {
-            "name": "Python Developer",
-            "alternate_url": "https://hh.ru/vacancy/123",
-            "salary": {"from": 100000, "to": 150000, "currency": "RUR"},
-            "snippet": {"requirement": "Python experience"},
-        }
-    ],
-)
-def test_user_interaction_api(mock_get_vacancies, mock_print, mock_input):
-    user_interaction()
-    mock_print.assert_any_call("Добро пожаловать в поиск вакансий на hh.ru!")
-    mock_print.assert_any_call("До свидания!")
+def test_user_interaction_add_vacancy():
+    """Тест добавления вакансии."""
+    with patch("builtins.input", side_effect=["5", "Test Job", "https://hh.ru", "100000 RUR", "Description", "8"]):
+        with patch("src.file_worker.JSONSaver.add_vacancy") as mocked_add:
+            user_interaction()
+            mocked_add.assert_called()
 
+def test_user_interaction_filter_description(monkeypatch):
+    """Тест фильтрации по описанию."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+        def json(self):
+            return {
+                "items": [
+                    {"name": "Job1", "alternate_url": "https://hh.ru", "salary": None, "description": "Python", "id": "1"}
+                ]
+            }
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: MockResponse())
+    with patch("builtins.input", side_effect=["1", "Python", "2", "Python", "8"]):
+        user_interaction()
 
-@patch("builtins.input", side_effect=["invalid", "y", "3"])
-@patch("builtins.print")
-@patch("src.interaction.os.path.exists", return_value=True)
-@patch("src.interaction.json.load", return_value=[])
-def test_user_interaction_invalid_input(
-    mock_json_load, mock_exists, mock_print, mock_input
-):
-    user_interaction()
-    mock_print.assert_any_call("Ошибка: введите 'да', 'нет', 'y' или 'n'.")
-    mock_print.assert_any_call("В файле vacancies.json нет валидных вакансий.")
+def test_user_interaction_top_vacancies(monkeypatch):
+    """Тест вывода топ вакансий."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+        def json(self):
+            return {
+                "items": [
+                    {"name": "Job1", "alternate_url": "https://hh.ru", "salary": {"from": 100000, "to": 150000, "currency": "RUR"}, "description": "Desc", "id": "1"}
+                ]
+            }
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: MockResponse())
+    with patch("builtins.input", side_effect=["1", "Python", "3", "1", "8"]):
+        user_interaction()
 
-
-@patch("builtins.input", side_effect=["y", "1", "2", "3"])
-@patch("builtins.print")
-@patch("src.interaction.os.path.exists", return_value=True)
-@patch(
-    "src.interaction.json.load",
-    return_value=[
-        {
-            "title": "Python Developer",
-            "url": "https://hh.ru/vacancy/123",
-            "salary": "100000-150000 RUR",
-            "description": "Python experience",
-        }
-    ],
-)
-def test_user_interaction_top_n(mock_json_load, mock_exists, mock_print, mock_input):
-    user_interaction()
-    mock_print.assert_any_call("Вакансия 1:")
-    mock_print.assert_any_call("До свидания!")
+def test_user_interaction_salary_filter(monkeypatch):
+    """Тест фильтрации по зарплате."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+        def json(self):
+            return {
+                "items": [
+                    {"name": "Job1", "alternate_url": "https://hh.ru", "salary": {"from": 100000, "to": 150000, "currency": "RUR"}, "description": "Desc", "id": "1"}
+                ]
+            }
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: MockResponse())
+    with patch("builtins.input", side_effect=["1", "Python", "4", "100000-150000", "8"]):
+        user_interaction()

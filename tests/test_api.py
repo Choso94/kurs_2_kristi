@@ -1,46 +1,60 @@
 import pytest
 import requests
-from unittest.mock import patch
 from src.api import HeadHunterAPI
+from typing import List, Dict, Any
 
+def test_connect_success(monkeypatch):
+    """Тест успешного подключения к API."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: MockResponse())
+    api = HeadHunterAPI()
+    api._connect()  # Не должно выбросить исключение
 
-@pytest.fixture
-def hh_api():
-    return HeadHunterAPI()
+def test_connect_failure(monkeypatch):
+    """Тест неудачного подключения к API."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 404
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: MockResponse())
+    api = HeadHunterAPI()
+    with pytest.raises(Exception, match="Ошибка подключения: HTTP 404"):
+        api._connect()
 
-
-@patch("requests.get")
-def test_get_vacancies_success(mock_get, hh_api):
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = {
-        "items": [
-            {"name": "Python Developer", "alternate_url": "https://hh.ru/vacancy/123"}
-        ]
-    }
-    vacancies = hh_api.get_vacancies("Python")
+def test_get_vacancies_success(monkeypatch):
+    """Тест успешного получения вакансий."""
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+        def json(self):
+            return {"items": [{"name": "Job", "alternate_url": "https://hh.ru", "salary": None, "description": "Desc", "id": "1"}]}
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: MockResponse())
+    api = HeadHunterAPI()
+    vacancies = api.get_vacancies("test")
     assert len(vacancies) == 1
-    assert vacancies[0]["name"] == "Python Developer"
+    assert vacancies[0]["title"] == "Job"
 
+def test_get_vacancies_failure(monkeypatch):
+    """Тест неудачного получения вакансий."""
+    # Создаём два разных ответа: один для _connect, другой для get_vacancies
+    def mock_get(*args, **kwargs):
+        # Для _connect (без параметров, только базовый URL)
+        if args[0] == "https://api.hh.ru/vacancies" and not kwargs.get("params"):
+            class ConnectResponse:
+                def __init__(self):
+                    self.status_code = 200
+                def json(self):  # Добавляем метод json, чтобы избежать ошибок
+                    return {}
+            return ConnectResponse()
+        # Для get_vacancies (с параметрами)
+        else:
+            class FailResponse:
+                def __init__(self):
+                    self.status_code = 500
+            return FailResponse()
 
-@patch("requests.get")
-def test_get_vacancies_empty(mock_get, hh_api):
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = {"items": []}
-    vacancies = hh_api.get_vacancies("Python")
-    assert vacancies == []
-
-
-@patch("requests.get")
-def test_get_vacancies_connection_error(mock_get, hh_api):
-    mock_get.side_effect = requests.ConnectionError("No internet")
-    with pytest.raises(Exception, match="Ошибка подключения"):
-        hh_api.get_vacancies("Python")
-
-
-@patch("requests.get")
-def test_get_vacancies_http_error(mock_get, hh_api):
-    mock_get.side_effect = requests.HTTPError(
-        response=type("Response", (), {"status_code": 404})()
-    )
-    with pytest.raises(Exception, match="Ошибка API: HTTP 404"):
-        hh_api.get_vacancies("Python")
+    monkeypatch.setattr(requests, "get", mock_get)
+    api = HeadHunterAPI()
+    with pytest.raises(Exception, match="Ошибка API: HTTP 500"):
+        api.get_vacancies("test")

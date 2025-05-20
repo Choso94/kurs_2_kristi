@@ -1,118 +1,139 @@
-import json
-import os
 from src.api import HeadHunterAPI
-from src.vacancy import Vacancy
 from src.file_worker import JSONSaver
-from src.utils import (
-    filter_vacancies,
-    sort_vacancies,
-    get_top_vacancies,
-    print_vacancies,
-)
+from src.vacancy import Vacancy
+from src.utils import filter_vacancies, get_top_vacancies, filter_by_salary_range
+from typing import List
 
 
 def user_interaction() -> None:
-    """Функция для взаимодействия с пользователем через консоль."""
-    hh_api = HeadHunterAPI()
-    json_saver = JSONSaver()
-
+    """Интерфейс взаимодействия с пользователем через консоль."""
     print("Добро пожаловать в поиск вакансий на hh.ru!")
-    while True:
-        use_local = (
-            input("Использовать локальный vacancies.json? (да/нет, y/n): ")
-            .strip()
-            .lower()
-        )
-        if use_local in ("y", "yes", "да"):
-            use_local = True
-            break
-        elif use_local in ("n", "no", "нет"):
-            use_local = False
-            break
-        print("Ошибка: введите 'да', 'нет', 'y' или 'n'.")
-
-    if use_local:
-        if not os.path.exists("vacancies.json"):
-            print("Ошибка: файл vacancies.json не найден.")
-            print(
-                "Попробуйте запустить программу с API для создания файла или добавьте vacancies.json вручную."
-            )
-            return
-        try:
-            with open("vacancies.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # Проверяем, является ли data списком или словарем с 'items'
-            vacancies_data = data.get("items", data) if isinstance(data, dict) else data
-            if not isinstance(vacancies_data, list):
-                print("Ошибка: некорректный формат данных в vacancies.json.")
-                return
-            vacancies = Vacancy.cast_to_object_list(vacancies_data)
-            if not vacancies:
-                print("В файле vacancies.json нет валидных вакансий.")
-                return
-        except Exception as e:
-            print(f"Ошибка при чтении vacancies.json: {e}")
-            return
-    else:
-        search_query = input("Введите поисковый запрос (например, Python): ").strip()
-        if not search_query:
-            print("Ошибка: поисковый запрос не может быть пустым.")
-            return
-        try:
-            vacancies_data = hh_api.get_vacancies(search_query)
-            vacancies = Vacancy.cast_to_object_list(vacancies_data)
-        except Exception as e:
-            print(f"Ошибка при получении вакансий: {e}")
-            print("Рекомендации:")
-            print("- Проверьте подключение к интернету.")
-            print(
-                "- Используйте локальный файл vacancies.json (выберите 'да' при запуске)."
-            )
-            print("- Повторите запрос позже.")
-            return
-
-    if not vacancies:
-        print(f"Вакансии по запросу '{search_query}' не найдены.")
-        print("Попробуйте изменить запрос или использовать локальный vacancies.json.")
-        return
-
-    # Сохраняем вакансии в файл
-    for vacancy in vacancies:
-        json_saver.add_vacancy(vacancy.to_dict())
+    saver = JSONSaver()
+    # Загружаем сохраненные вакансии
+    saved_vacancies_data = saver.get_vacancies({})
+    saved_vacancies = Vacancy.cast_to_object_list(saved_vacancies_data)
+    vacancies: List[Vacancy] = saved_vacancies.copy()
+    next_id = max((v.id for v in saved_vacancies if v.id is not None), default=0) + 1
 
     while True:
         print("\nВыберите действие:")
-        print("1. Показать топ-N вакансий по зарплате")
-        print("2. Фильтровать вакансии по ключевым словам")
-        print("3. Выйти")
-        choice = input("Ваш выбор (1-3): ").strip()
+        print("1. Поиск вакансий по названию работы")
+        print("2. Поиск вакансий по описанию")
+        print("3. Топ вакансий по зарплате")
+        print("4. Фильтр по диапазону зарплат")
+        print("5. Добавить вакансию")
+        print("6. Посмотреть сохраненные вакансии")
+        print("7. Удалить вакансию")
+        print("8. Выйти")
+
+        choice = input("Ваш выбор (1-8): ")
 
         if choice == "1":
-            try:
-                top_n = int(input("Введите количество вакансий для вывода: "))
-                if top_n <= 0:
-                    print("Ошибка: количество должно быть положительным.")
-                    continue
-            except ValueError:
-                print("Ошибка: введите целое число.")
+            query = input("Введите название работы (например, Python): ")
+            if len(query.strip()) < 2:
+                print("Запрос должен содержать минимум 2 символа.")
                 continue
-            sorted_vacancies = sort_vacancies(vacancies)
-            top_vacancies = get_top_vacancies(sorted_vacancies, top_n)
-            print_vacancies(top_vacancies)
+            api = HeadHunterAPI()
+            try:
+                raw_vacancies = api.get_vacancies(query)
+                new_vacancies = Vacancy.cast_to_object_list(raw_vacancies)
+                vacancies = saved_vacancies + new_vacancies
+                if vacancies:
+                    print(f"Найдено {len(vacancies)} вакансий:")
+                    for v in vacancies[:5]:
+                        print(f"Название: {v.title} | Зарплата: {v.salary} | URL: {v.url}")
+                else:
+                    print("Вакансии не найдены.")
+            except Exception as e:
+                print(f"Ошибка: {e}")
 
         elif choice == "2":
-            filter_words = (
-                input("Введите ключевые слова для фильтрации (через пробел): ")
-                .strip()
-                .split()
-            )
-            filtered_vacancies = filter_vacancies(vacancies, filter_words)
-            sorted_vacancies = sort_vacancies(filtered_vacancies)
-            print_vacancies(sorted_vacancies)
+            keyword = input("Введите ключевое слово для описания: ")
+            if len(keyword.strip()) < 2:
+                print("Ключевое слово должно содержать минимум 2 символа.")
+                continue
+            if not vacancies:
+                print("Сначала выполните поиск вакансий (пункт 1).")
+                continue
+            filtered = filter_vacancies(vacancies, keyword)
+            if filtered:
+                print(f"Найдено {len(filtered)} вакансий:")
+                for v in filtered[:5]:
+                    print(f"Название: {v.title} | Описание: {v.description}")
+            else:
+                print("Вакансии с таким описанием не найдены.")
 
         elif choice == "3":
+            try:
+                n = int(input("Введите количество вакансий для топа: "))
+                if n <= 0:
+                    print("Введите положительное число.")
+                    continue
+                if not vacancies:
+                    print("Сначала выполните поиск вакансий (пункт 1).")
+                    continue
+                top = get_top_vacancies(vacancies, n)
+                if top:
+                    print(f"Топ {len(top)} вакансий по зарплате:")
+                    for i, v in enumerate(top, 1):
+                        print(f"{i}. Название: {v.title} | Зарплата: {v.salary}")
+                else:
+                    print("Вакансии не найдены.")
+            except ValueError:
+                print("Введите число.")
+
+        elif choice == "4":
+            salary_range = input("Введите диапазон зарплат (например, 100000-150000): ")
+            if not vacancies:
+                print("Сначала выполните поиск вакансий (пункт 1).")
+                continue
+            filtered = filter_by_salary_range(vacancies, salary_range)
+            if filtered:
+                print(f"Найдено {len(filtered)} вакансий в диапазоне:")
+                for v in filtered[:5]:
+                    print(f"Название: {v.title} | Зарплата: {v.salary}")
+            else:
+                print("Вакансии в этом диапазоне не найдены.")
+
+        elif choice == "5":
+            title = input("Введите название вакансии: ")
+            if len(title.strip()) < 2:
+                print("Название должно содержать минимум 2 символа.")
+                continue
+            url = input("Введите URL (например, https://hh.ru/vacancy/123): ")
+            if not url.startswith("http"):
+                print("URL должен начинаться с http или https.")
+                continue
+            salary = input("Введите зарплату (например, 100000-150000 RUR): ")
+            description = input("Введите описание: ")
+            vacancy = Vacancy(title, url, salary, description, next_id).to_dict()
+            saver.add_vacancy(vacancy)
+            next_id += 1
+            saved_vacancies = Vacancy.cast_to_object_list(saver.get_vacancies({}))
+            vacancies = saved_vacancies.copy()
+            print("Вакансия добавлена.")
+
+        elif choice == "6":
+            data = saver.get_vacancies({})
+            if not data:
+                print("Сохраненных вакансий нет.")
+                continue
+            print(f"Найдено {len(data)} сохраненных вакансий:")
+            for v in data[:5]:
+                print(f"ID: {v['id']} | Название: {v['title']} | Зарплата: {v['salary']}")
+
+        elif choice == "7":
+            try:
+                vid = int(input("Введите ID вакансии для удаления: "))
+                saver.delete_vacancy(vid)
+                saved_vacancies = Vacancy.cast_to_object_list(saver.get_vacancies({}))
+                vacancies = saved_vacancies.copy()
+                print("Вакансия удалена.")
+            except ValueError:
+                print("Введите число.")
+
+        elif choice == "8":
             print("До свидания!")
             break
-
         else:
-            print("Ошибка: выберите 1, 2 или 3.")
+            print("Введите число от 1 до 8.")

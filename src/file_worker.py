@@ -1,15 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
 import json
-import os
+from typing import List, Dict, Any
 
 
-class AbstractFileWorker(ABC):
-    """Абстрактный класс для работы с файлами."""
+class DataManager(ABC):
+    """Абстрактный класс для работы с хранилищем данных."""
 
     @abstractmethod
     def add_vacancy(self, vacancy: Dict[str, Any]) -> None:
-        """Добавляет вакансию в файл."""
+        """Добавляет вакансию в хранилище."""
         pass
 
     @abstractmethod
@@ -18,73 +17,71 @@ class AbstractFileWorker(ABC):
         pass
 
     @abstractmethod
-    def delete_vacancy(self, vacancy: Dict[str, Any]) -> None:
-        """Удаляет вакансию из файла."""
+    def delete_vacancy(self, vacancy_id: int) -> None:
+        """Удаляет вакансию по ID."""
         pass
 
 
-class JSONSaver(AbstractFileWorker):
-    """Класс для работы с JSON-файлами."""
+class JSONSaver(DataManager):
+    """Класс для работы с вакансиями в JSON-файле."""
 
     def __init__(self, filename: str = "vacancies.json"):
-        """Инициализирует имя файла."""
-        self.__filename = filename
+        self._filename: str = filename
 
     def add_vacancy(self, vacancy: Dict[str, Any]) -> None:
-        """Добавляет вакансию, избегая дубликатов."""
-        vacancies = self._read_vacancies()
-        # Проверяем, что vacancies - это список
-        if not isinstance(vacancies, list):
-            vacancies = []
-        # Проверяем, нет ли вакансии с таким же URL
-        if not any(
-            isinstance(v, dict) and v.get("url") == vacancy["url"] for v in vacancies
-        ):
-            vacancies.append(vacancy)
-            self._write_vacancies(vacancies)
+        """
+        Добавляет вакансию, избегая дубликатов по URL.
+
+        Args:
+            vacancy: Словарь с данными вакансии.
+        """
+        current_data = self._load()
+        if not any(v.get("url") == vacancy.get("url") for v in current_data):
+            current_data.append(vacancy)
+            self._save(current_data)
 
     def get_vacancies(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Получает вакансии по критериям."""
-        vacancies = self._read_vacancies()
-        if not isinstance(vacancies, list):
-            return []
-        filtered = []
-        for vacancy in vacancies:
-            if not isinstance(vacancy, dict):
-                continue
-            matches = True
-            for key, value in criteria.items():
-                if key not in vacancy or vacancy[key] != value:
-                    matches = False
-                    break
-            if matches:
-                filtered.append(vacancy)
+        """
+        Получает вакансии по критериям.
+
+        Args:
+            criteria: Словарь с критериями (например, {"description": "Python"}).
+
+        Returns:
+            List[Dict[str, Any]]: Отфильтрованный список вакансий.
+        """
+        data = self._load()
+        if not criteria:
+            return data
+        filtered = [
+            v for v in data
+            if all(
+                str(v.get(key, "")).lower().find(str(value).lower()) != -1
+                for key, value in criteria.items()
+            )
+        ]
         return filtered
 
-    def delete_vacancy(self, vacancy: Dict[str, Any]) -> None:
-        """Удаляет вакансию по URL."""
-        vacancies = self._read_vacancies()
-        if not isinstance(vacancies, list):
-            return
-        vacancies = [
-            v
-            for v in vacancies
-            if not isinstance(v, dict) or v.get("url") != vacancy["url"]
-        ]
-        self._write_vacancies(vacancies)
+    def delete_vacancy(self, vacancy_id: int) -> None:
+        """
+        Удаляет вакансию по ID.
 
-    def _read_vacancies(self) -> List[Dict[str, Any]]:
-        """Читает вакансии из файла."""
-        if not os.path.exists(self.__filename):
-            return []
+        Args:
+            vacancy_id: ID вакансии для удаления.
+        """
+        current_data = self._load()
+        current_data = [v for v in current_data if v.get("id") != vacancy_id]
+        self._save(current_data)
+
+    def _load(self) -> List[Dict[str, Any]]:
+        """Загружает данные из файла."""
         try:
-            with open(self.__filename, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data
-        except (json.JSONDecodeError, TypeError):
+            with open(self._filename, "r", encoding="utf-8") as file:
+                return json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
             return []
 
-    def _write_vacancies(self, vacancies: List[Dict[str, Any]]) -> None:
-        """Записывает вакансии в файл."""
-        with open(self.__filename, "w", encoding="utf-8") as f:
-            json.dump(vacancies, f, ensure_ascii=False, indent=2)
+    def _save(self, data: List[Dict[str, Any]]) -> None:
+        """Сохраняет данные в файл."""
+        with open(self._filename, "w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)

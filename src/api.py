@@ -1,48 +1,77 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
 import requests
+from typing import List, Dict, Any
 
 
-class AbstractAPI(ABC):
-    """Абстрактный класс для работы с API."""
+class APIClient(ABC):
+    """Абстрактный класс для работы с API вакансий."""
 
     @abstractmethod
-    def get_vacancies(self, search_query: str) -> List[Dict[str, Any]]:
-        """Получает список вакансий по поисковому запросу."""
+    def _connect(self) -> None:
+        """Подключается к API и проверяет статус."""
+        pass
+
+    @abstractmethod
+    def get_vacancies(self, keyword: str) -> List[Dict[str, Any]]:
+        """Получает вакансии по ключевому слову."""
         pass
 
 
-class HeadHunterAPI(AbstractAPI):
-    """Класс для работы с API hh.ru."""
+class HeadHunterAPI(APIClient):
+    """Класс для интеграции с API hh.ru."""
 
-    def get_vacancies(self, search_query: str) -> List[Dict[str, Any]]:
-        """Получает вакансии с hh.ru по поисковому запросу."""
-        url = "https://api.hh.ru/vacancies"
-        params = {"text": search_query, "per_page": 100, "page": 0}
-        try:
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            print(
-                f"Ответ API: {data.get('items', [])[:2]}"
-            )  # Отладка: первые 2 вакансии
-            vacancies = data.get("items", [])
-            if not vacancies:
-                print(f"По запросу '{search_query}' вакансии не найдены.")
-            return vacancies
-        except requests.ConnectionError:
-            raise Exception("Ошибка подключения: проверьте интернет-соединение.")
-        except requests.Timeout:
-            raise Exception("Превышено время ожидания: попробуйте позже.")
-        except requests.HTTPError as e:
-            msg = (
-                f"Ошибка API: HTTP {e.response.status_code}. "
-                f"Попробуйте позже или используйте локальный vacancies.json."
-            )
-            raise Exception(msg)
-        except requests.RequestException as e:
-            msg = (
-                f"Неизвестная ошибка API: {e}. "
-                f"Используйте локальный vacancies.json или проверьте запрос."
-            )
-            raise Exception(msg)
+    def __init__(self):
+        self._base_url: str = "https://api.hh.ru/vacancies"
+
+    def _connect(self) -> None:
+        """
+        Проверяет подключение к API по базовому URL.
+
+        Raises:
+            Exception: Если статус-код не 200.
+        """
+        response = requests.get(self._base_url)
+        if response.status_code != 200:
+            raise Exception(f"Ошибка подключения: HTTP {response.status_code}")
+
+    def get_vacancies(self, keyword: str) -> List[Dict[str, Any]]:
+        """
+        Получает вакансии с hh.ru по ключевому слову.
+
+        Args:
+            keyword: Ключевое слово для поиска.
+
+        Returns:
+            List[Dict[str, Any]]: Список вакансий с извлеченными полями.
+        """
+        self._connect()
+        params = {"text": keyword, "per_page": 100}
+        response = requests.get(self._base_url, params=params)
+        if response.status_code == 200:
+            items = response.json().get("items", [])
+            return [
+                {
+                    "title": item.get("name", "Неизвестная вакансия"),
+                    "url": item.get("alternate_url", ""),
+                    "salary": self._parse_salary(item.get("salary", {})),
+                    "description": item.get("description", ""),
+                    "id": item.get("id")
+                }
+                for item in items
+            ]
+        raise Exception(f"Ошибка API: HTTP {response.status_code}")
+
+    def _parse_salary(self, salary_data: Dict[str, Any]) -> str:
+        """Извлекает зарплату из данных API."""
+        if not salary_data or salary_data.get("from") is None and salary_data.get("to") is None:
+            return "Зарплата не указана"
+        currency = salary_data.get("currency", "RUR")
+        salary_from = salary_data.get("from")
+        salary_to = salary_data.get("to")
+        if salary_from and salary_to:
+            return f"{int(salary_from)}-{int(salary_to)} {currency}"
+        elif salary_from:
+            return f"от {int(salary_from)} {currency}"
+        elif salary_to:
+            return f"до {int(salary_to)} {currency}"
+        return "Зарплата не указана"
