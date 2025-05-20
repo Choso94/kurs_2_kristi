@@ -35,7 +35,7 @@ def test_get_vacancies_success(monkeypatch):
     assert len(vacancies) == 1
     assert vacancies[0]["title"] == "Job"
 
-def test_get_vacancies_failure(monkeypatch):
+def test_get_vacancies_failure(monkeypatch, capsys):
     """Тест неудачного получения вакансий."""
     # Создаём два разных ответа: один для _connect, другой для get_vacancies
     def mock_get(*args, **kwargs):
@@ -56,5 +56,9 @@ def test_get_vacancies_failure(monkeypatch):
 
     monkeypatch.setattr(requests, "get", mock_get)
     api = HeadHunterAPI()
-    with pytest.raises(Exception, match="Ошибка API: HTTP 500"):
-        api.get_vacancies("test")
+    # Проверяем, что метод возвращает пустой список вместо выброса исключения
+    vacancies = api.get_vacancies("test")
+    assert vacancies == [], "Ожидался пустой список при ошибке API"
+    # Проверяем, что отладочное сообщение было выведено
+    captured = capsys.readouterr()
+    assert "Ошибка API: HTTP 500" in captured.out, "Ожидалось сообщение об ошибке API"
