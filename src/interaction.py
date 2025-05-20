@@ -37,15 +37,19 @@ def user_interaction() -> None:
             try:
                 raw_vacancies = api.get_vacancies(query)
                 new_vacancies = Vacancy.cast_to_object_list(raw_vacancies)
+                # Комбинируем сохранённые и новые вакансии
                 vacancies = saved_vacancies + new_vacancies
-                if vacancies:
-                    print(f"Найдено {len(vacancies)} вакансий:")
-                    for v in vacancies[:5]:
+                # Фильтруем по названию
+                filtered_vacancies = [v for v in vacancies if query.lower() in v.title.lower()]
+                if filtered_vacancies:
+                    print(f"Найдено {len(filtered_vacancies)} вакансий:")
+                    for v in filtered_vacancies[:5]:
                         print(f"Название: {v.title} | Зарплата: {v.salary} | URL: {v.url}")
                 else:
                     print("Вакансии не найдены.")
             except Exception as e:
                 print(f"Ошибка: {e}")
+                vacancies = saved_vacancies.copy()  # Возвращаемся к сохранённым вакансиям
 
         elif choice == "2":
             keyword = input("Введите ключевое слово для описания: ")

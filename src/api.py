@@ -46,24 +46,31 @@ class HeadHunterAPI(APIClient):
         """
         self._connect()
         params = {"text": keyword, "per_page": 100}
-        response = requests.get(self._base_url, params=params)
-        if response.status_code == 200:
-            items = response.json().get("items", [])
-            return [
-                {
-                    "title": item.get("name", "Неизвестная вакансия"),
-                    "url": item.get("alternate_url", ""),
-                    "salary": self._parse_salary(item.get("salary", {})),
-                    "description": item.get("description", ""),
-                    "id": item.get("id")
-                }
-                for item in items
-            ]
-        raise Exception(f"Ошибка API: HTTP {response.status_code}")
+        try:
+            response = requests.get(self._base_url, params=params)
+            print(f"API response status: {response.status_code}")  # Отладочный вывод
+            if response.status_code == 200:
+                items = response.json().get("items", [])
+                print(f"API returned {len(items)} items")  # Отладочный вывод
+                return [
+                    {
+                        "title": item.get("name", "Неизвестная вакансия"),
+                        "url": item.get("alternate_url", ""),
+                        "salary": self._parse_salary(item.get("salary", None)),
+                        "description": item.get("snippet", {}).get("responsibility", "") or item.get("snippet", {}).get(
+                            "requirement", ""),
+                        "id": item.get("id")
+                    }
+                    for item in items
+                ]
+            raise Exception(f"Ошибка API: HTTP {response.status_code}")
+        except Exception as e:
+            print(f"Ошибка при запросе к API: {e}")  # Отладочный вывод
+            return []
 
-    def _parse_salary(self, salary_data: Dict[str, Any]) -> str:
+    def _parse_salary(self, salary_data: Dict[str, Any] | None) -> str:
         """Извлекает зарплату из данных API."""
-        if not salary_data or salary_data.get("from") is None and salary_data.get("to") is None:
+        if not salary_data or (salary_data.get("from") is None and salary_data.get("to") is None):
             return "Зарплата не указана"
         currency = salary_data.get("currency", "RUR")
         salary_from = salary_data.get("from")
